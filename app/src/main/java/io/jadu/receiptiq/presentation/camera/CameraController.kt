@@ -1,4 +1,4 @@
-package io.jadu.receiptiq.data.camera
+package io.jadu.receiptiq.presentation.camera
 
 import android.content.Context
 import androidx.camera.core.CameraSelector
@@ -9,6 +9,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import io.jadu.receiptiq.presentation.scanner.ReceiptImageCapturer
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import kotlin.coroutines.resume
@@ -16,7 +17,7 @@ import kotlin.coroutines.resumeWithException
 
 class CameraController(
     private val context: Context
-){
+) : ReceiptImageCapturer {
     private var imageCapture: ImageCapture? = null
     private var cameraProvider: ProcessCameraProvider? = null
     fun startCamera(
@@ -70,7 +71,7 @@ class CameraController(
     }
 
 
-    suspend fun captureReceipt(): String {
+    override suspend fun captureReceipt(): String {
 
         val imageCapture = imageCapture
             ?: throw IllegalStateException(

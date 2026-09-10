@@ -2,8 +2,10 @@ package io.jadu.receiptiq.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.jadu.receiptiq.data.camera.CameraController
+import io.jadu.receiptiq.presentation.camera.CameraController
 import io.jadu.receiptiq.domain.model.CapturedReceipt
+import io.jadu.receiptiq.domain.ocr.ocr.ReceiptTextRecognizer
+import io.jadu.receiptiq.presentation.scanner.ReceiptImageCapturer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,7 +14,8 @@ import org.koin.core.annotation.KoinViewModel
 
 @KoinViewModel
 class ReceiptScannerViewModel(
-    val cameraController: CameraController
+    val receiptImageCapturer: ReceiptImageCapturer,
+    val receiptTextRecognizer: ReceiptTextRecognizer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReceiptScannerUiState>(ReceiptScannerUiState())
@@ -20,21 +23,30 @@ class ReceiptScannerViewModel(
 
 
     fun captureReceipt() {
-        if(_uiState.value.isCapturing) return
+        if (_uiState.value.isCapturing) return
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isCapturing = true, error = null)
-            runCatching { cameraController.captureReceipt()}
-                .onSuccess {
+            val path = runCatching { receiptImageCapturer.captureReceipt() }
+                .getOrElse { error ->
                     _uiState.value = ReceiptScannerUiState(
-                        capturedReceipt = CapturedReceipt(it)
+                        error = error.message ?: "Unable to capture image"
                     )
+                    return@launch
                 }
-                .onFailure {
-                    _uiState.value = ReceiptScannerUiState(
-                        error = it.message
-                    )
-                }
+
+            val textResult = runCatching { receiptTextRecognizer.recognizeText(path) }
+            textResult.onSuccess { extractedText ->
+                _uiState.value = ReceiptScannerUiState(
+                    capturedReceipt = CapturedReceipt(path),
+                    extractedText = extractedText
+                )
+            }.onFailure { error ->
+                _uiState.value = ReceiptScannerUiState(
+                    capturedReceipt = CapturedReceipt(path),
+                    error = error.message ?: "Unable to read the receipt"
+                )
+            }
         }
     }
 

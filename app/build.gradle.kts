@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.koin.compiler)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
 }
 
 android {
@@ -68,5 +69,13 @@ dependencies {
     api(libs.androidx.camera.viewfinder.compose)
     implementation(libs.coil.compose)
     // camera impl
+
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.androidx.material3.adaptive.navigation3)
+    implementation(libs.kotlinx.serialization.core)
 
 }

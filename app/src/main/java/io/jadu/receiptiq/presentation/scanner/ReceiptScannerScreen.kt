@@ -1,4 +1,4 @@
-package io.jadu.receiptiq.presentation
+package io.jadu.receiptiq.presentation.scanner
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,25 +26,36 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import io.jadu.receiptiq.data.camera.CameraController
+import io.jadu.receiptiq.presentation.CameraPreview
+import io.jadu.receiptiq.presentation.ReceiptScannerViewModel
+import io.jadu.receiptiq.presentation.camera.CameraController
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun ReceiptScannerScreen(
-    uiState: ReceiptScannerUiState,
-    cameraController: CameraController,
-    onCapture: () -> Unit,
-    onRetake: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val cameraController: CameraController = koinInject()
+    val viewModel: ReceiptScannerViewModel = koinViewModel()
+    val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+
     var hasCameraPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        )
     }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCameraPermission = it
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            hasCameraPermission = it
+        }
 
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -53,31 +65,53 @@ fun ReceiptScannerScreen(
         when {
             uiState.capturedReceipt != null -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     AsyncImage(
                         model = uiState.capturedReceipt.imagePath,
                         contentDescription = "Captured receipt",
-                        modifier = Modifier.fillMaxWidth().weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
                     )
-                    Button(onClick = onRetake, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text(
+                        text = uiState.extractedText?.ifBlank { "No text found" } ?: "Reading receipt...",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                    )
+                    Button(
+                        onClick = viewModel::retake,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                    ) {
                         Text("Retake")
                     }
                 }
             }
+
             !hasCameraPermission -> Text("Camera permission is required to scan a receipt")
             else -> {
                 CameraPreview(
                     cameraController = cameraController,
                     lifecycleOwner = lifecycleOwner,
-                    onCapture = onCapture,
+                    onCapture = viewModel::captureReceipt,
                     isCapturing = uiState.isCapturing,
                     modifier = Modifier.fillMaxSize()
                 )
                 uiState.error?.let { error ->
-                    Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.TopCenter).padding(16.dp))
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(16.dp)
+                    )
                 }
             }
         }
